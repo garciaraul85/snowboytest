@@ -1,12 +1,18 @@
 package snowboy.kitt.ai.snowboytest;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.text.Html;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -22,6 +28,7 @@ import ai.kitt.snowboy.audio.RecordingThread;
 
 public class Demo extends Activity {
 
+    private static final String TAG = "Demo";
     private Button record_button;
     private Button play_button;
     private TextView log;
@@ -34,17 +41,66 @@ public class Demo extends Activity {
     private RecordingThread recordingThread;
     private PlaybackThread playbackThread;
 
+    //Requesting run-time permissions
+
+    //Create placeholder for user's consent to record_audio permission.
+    //This will be used in handling callback
+
+    private final static int PERMISSION_ALL = 1;
+    String[] PERMISSIONS = {
+            Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+    };
+
+    public static boolean hasPermissions(Context context, String... permissions) {
+        if (context != null && permissions != null) {
+            for (String permission : permissions) {
+                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSION_ALL: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted, yay!
+                    init();
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(this, "Permissions Denied to record audio", Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+        }
+
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
         setUI();
-        
+        if(!hasPermissions(this, PERMISSIONS)){
+            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
+        } else {
+            init();
+        }
+    }
+
+    private void init() {
         setProperVolume();
 
         AppResCopy.copyResFromAssetsToSD(this);
-        
+
         activeTimes = 0;
         recordingThread = new RecordingThread(handle, new AudioDataSaver());
         playbackThread = new PlaybackThread();
@@ -55,16 +111,16 @@ public class Demo extends Activity {
     }
     
     private void setUI() {
-        record_button = (Button) findViewById(R.id.btn_test1);
+        record_button = findViewById(R.id.btn_test1);
         record_button.setOnClickListener(record_button_handle);
         record_button.setEnabled(true);
         
-        play_button = (Button) findViewById(R.id.btn_test2);
+        play_button = findViewById(R.id.btn_test2);
         play_button.setOnClickListener(play_button_handle);
         play_button.setEnabled(true);
 
-        log = (TextView)findViewById(R.id.log);
-        logView = (ScrollView)findViewById(R.id.logView);
+        log = findViewById(R.id.log);
+        logView = findViewById(R.id.logView);
     }
     
     private void setMaxVolume() {
@@ -126,8 +182,11 @@ public class Demo extends Activity {
     }
 
     private void sleep() {
-        try { Thread.sleep(500);
-        } catch (Exception e) {}
+        try {
+            Thread.sleep(500);
+        } catch (Exception e) {
+            Log.e(TAG, e.getMessage());
+        }
     }
     
     private OnClickListener record_button_handle = new OnClickListener() {
